@@ -56,12 +56,23 @@ cd voice_record
 
    (FFmpeg juga dibutuhkan untuk konversi audio — `static_ffmpeg` sudah menyertakan binary-nya.)
 
-3. **Siapkan model offline (untuk fitur clone):**
+3. **Download model offline (untuk fitur clone suara) — ±1.3GB:**
 
-   - Bikin folder `models/indo_v2/`
-   - Letakkan `f5_tts_indo_v2.pt` dan `vocab.txt` di `models/indo_v2/`
+   File model **tidak** ikut di GitHub (terlalu besar). Download manual lalu taruh di folder yang benar. Tanpa model ini, fitur online tetap jalan.
 
-   File modelnya **tidak** ikut di GitHub (terlalu besar, ±1.2GB). Tanpa model ini fitur online tetap jalan.
+   **Model Indonesia (default, dipakai `app.py`):**
+
+   - `f5_tts_indo_v2.pt` → <https://huggingface.co/Eempostor/F5-TTS-INDO-FINETUNE-V2/resolve/main/f5_tts_indo_v2.pt?download=true>
+   - `vocab.txt` → <https://huggingface.co/Eempostor/F5-TTS-INDO-FINETUNE-V2/resolve/main/vocab.txt?download=true>
+   - Simpan ke: `models/indo_v2/f5_tts_indo_v2.pt` dan `models/indo_v2/vocab.txt`
+
+   **Model English (switching: ubah `MODEL_DIR`/`MODEL_PATH` di `app.py`):**
+
+   - F5TTS v1 Base (English, kalimat pendek, ±1.3GB) → <https://huggingface.co/SWivid/F5-TTS/tree/main/F5TTS_v1_Base>
+   - F5TTS Base (multilingual EN/ZH) → <https://huggingface.co/SWivid/F5-TTS/tree/main/F5TTS_Base>
+   - F5TTS Base pakai format `.safetensors`. Taruh di `models/` lalu perbarui variabel `MODEL_PATH` di `app.py` ke file tersebut (contoh: `F5TTS_v1_Base/model_1250000.safetensors`).
+
+   > Semua model ini tidak boleh dipakai untuk tujuan komersial / impersonasi (lisensi CC-BY-NC 4.0). Suara klon dibuat dari sampel yang di-upload user.
 
 4. **Jalankan:**
 
