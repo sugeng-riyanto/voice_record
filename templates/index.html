@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Clone Studio</title>
+<style>
+  :root { --bg:#0f1115; --card:#171a21; --accent:#4f8cff; --green:#51cf66; --red:#ff6b6b; --text:#e6e9f0; --muted:#9aa3b2; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:system-ui,Segoe UI,sans-serif; min-height:100vh; padding:24px; }
+  .wrap { max-width:820px; margin:0 auto; }
+  h1 { font-size:22px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .card { background:var(--card); border:1px solid #22262e; border-radius:12px; padding:20px; margin-bottom:16px; }
+  label { display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+  textarea, input[type=text], select { width:100%; background:#0d0f13; color:var(--text); border:1px solid #2a2f3a; border-radius:8px; padding:10px; font-size:14px; }
+  textarea { min-height:100px; resize:vertical; margin-bottom:8px; }
+
+  .recbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .btn { padding:10px 16px; background:var(--accent); color:#fff; border:none; border-radius:9px; font-size:14px; font-weight:600; cursor:pointer; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn.green { background:var(--green); } .btn.gray { background:#2a2f3a; color:var(--text); }
+  .btn.red { background:var(--red); }
+  .recind { width:12px; height:12px; border-radius:50%; background:#555; display:inline-block; }
+  .recind.on { background:var(--red); animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:.3; } }
+  .timer { font-variant-numeric:tabular-nums; color:var(--muted); font-size:14px; min-width:70px; }
+
+  .lib { display:flex; flex-direction:column; gap:8px; max-height:300px; overflow:auto; }
+  .sample { display:flex; align-items:center; gap:10px; background:#0d0f13; border:1px solid #2a2f3a; border-radius:9px; padding:10px; }
+  .sample.selected { border-color:var(--accent); background:#1b2440; }
+  .sample audio { flex:0 0 180px; height:36px; }
+  .sample .meta { flex:1; }
+  .sample .name { font-size:14px; font-weight:600; }
+  .sample .dur { font-size:12px; color:var(--muted); }
+  .sample .acts { display:flex; gap:6px; }
+  .icon-btn { background:none; border:1px solid #2a2f3a; color:var(--text); border-radius:7px; padding:6px 9px; font-size:12px; cursor:pointer; }
+  .icon-btn:hover { border-color:var(--accent); }
+  .icon-btn.del:hover { border-color:var(--red); color:var(--red); }
+
+  .modebox { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #2a2f3a; border-radius:9px; margin-bottom:12px; font-size:13px; }
+  .auto { color:var(--muted); }
+  .modebox .tag { padding:3px 8px; border-radius:6px; font-weight:700; font-size:12px; }
+  .tag.offline { background:#1b2440; color:#7fb0ff; }
+  .tag.online { background:#20281d; color:#8fd46a; }
+
+  .status { margin-top:12px; font-size:13px; white-space:pre-wrap; }
+  .err { color:var(--red); } .ok { color:var(--green); }
+  .player { margin-top:14px; display:none; }
+  .player audio { width:100%; }
+  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+  .inline { display:flex; gap:8px; }
+  .inline input { flex:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Voice Clone Studio</h1>
+  <div class="sub">Record / upload your voice → pick from library → generate speech (offline clone or online neural voice)</div>
+
+  <!-- Record / Upload -->
+  <div class="card">
+    <label>1. Record microphone or upload audio (sample 10-30s works best)</label>
+    <div class="recbar">
+      <button class="btn green" id="recBtn" onclick="toggleRec()">● Record</button>
+      <button class="btn red" id="stopBtn" style="display:none" onclick="stopRec()">■ Stop</button>
+      <span class="timer" id="timer">00:00</span>
+      <span class="recind" id="recind"></span>
+      <button class="btn gray" onclick="document.getElementById('upAudio').click()">⬆ Upload audio</button>
+      <input type="file" id="upAudio" accept="audio/*" style="display:none" onchange="uploadAudio(this)">
+    </div>
+    <div class="hint">Recording works in Chrome/Edge/Firefox. 12s max for offline cloning.</div>
+  </div>
+
+  <!-- Sample library -->
+  <div class="card">
+    <label>2. Voice library (CRUD)</label>
+    <div class="inline" style="margin-bottom:10px">
+      <input type="text" id="newName" placeholder="Nama sampel baru (default: Suara baru)">
+      <button class="btn gray" onclick="saveWithCustomName()">Save last capture</button>
+    </div>
+    <div class="lib" id="lib"></div>
+  </div>
+
+  <!-- Generate -->
+  <div class="card">
+    <label>3. Type text &amp; generate</label>
+    <div class="modebox" id="modebox">
+      <span class="auto">Auto mode:</span>
+      <span class="tag offline" id="modeTag">OFFLINE</span>
+      <span class="auto" id="modeNote">Will use selected voice sample</span>
+    </div>
+    <textarea id="text" placeholder="Tulis teks yang ingin diubah menjadi suara..."></textarea>
+    <div class="inline">
+      <button class="btn" id="go" onclick="generate()">Generate Voice</button>
+      <button class="btn gray" id="goForceOnline" onclick="generate(true)" title="Use online voices instead of offline clone">Force Online</button>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="player" id="player">
+      <audio id="audio" controls></audio>
+      <a id="dl" class="hint" href="#" style="display:block; margin-top:8px;">Download</a>
+    </div>
+  </div>
+</div>
+
+<script>
+let mediaRecorder = null, chunks = [], recStart = 0, timerId = null, lastBlob = null;
+
+// ---- Recording ----
+async function toggleRec() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') { stopRec(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    chunks = [];
+    recStart = Date.now();
+    mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      clearInterval(timerId);
+      document.getElementById('recind').classList.remove('on');
+      lastBlob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+      document.getElementById('status').textContent = 'Recording done. Now save it to the library above.';
+      document.getElementById('status').className = 'status ok';
+    };
+    mediaRecorder.start();
+    document.getElementById('recBtn').textContent = 'Pause';
+    document.getElementById('stopBtn').style.display = '';
+    document.getElementById('recind').classList.add('on');
+    timerId = setInterval(() => {
+      const s = Math.floor((Date.now() - recStart) / 1000);
+      document.getElementById('timer').textContent = String(s/60|0).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+      if (s >= 12) stopRec();
+    }, 500);
+  } catch(e) { showStatus('Microphone error: ' + e.message, 'err'); }
+}
+function stopRec() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+  document.getElementById('recBtn').textContent = '● Record';
+  document.getElementById('stopBtn').style.display = 'none';
+}
+
+// ---- Save capture ----
+function saveWithCustomName() {
+  const name = document.getElementById('newName').value.trim();
+  if (!lastBlob) { showStatus('Nothing recorded yet. Record first.', 'err'); return; }
+  saveBlob(lastBlob, name || 'Suara baru');
+}
+function uploadAudio(input) {
+  if (!input.files[0]) return;
+  const f = input.files[0];
+  saveBlob(f, f.name.replace(/\.[^.]+$/, '') || 'Upload');
+  input.value = '';
+}
+async function saveBlob(blob, name) {
+  const fd = new FormData();
+  fd.append('audio', blob, 'capture.webm');
+  fd.append('name', name);
+  const res = await fetch('/api/samples', { method:'POST', body: fd });
+  const data = await res.json();
+  if (data.ok) { refreshLib(); showStatus('Sample saved: ' + data.sample.name, 'ok'); }
+  else showStatus('Save failed: ' + (data.error || ''), 'err');
+}
+
+// ---- Library CRUD ----
+let selectedId = null;
+async function refreshLib() {
+  const res = await fetch('/api/samples');
+  const samples = await res.json();
+  const lib = document.getElementById('lib');
+  lib.innerHTML = '';
+  if (!samples.length) { lib.innerHTML = '<div class="hint">No voice samples yet.</div>'; return; }
+  samples.forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'sample' + (s.id === selectedId ? ' selected' : '');
+    div.innerHTML = `
+      <audio src="/samples/${s.id}/audio" controls preload="metadata"></audio>
+      <div class="meta">
+        <div class="name">${escapeHtml(s.name)}</div>
+        <div class="dur">${s.duration_s}s</div>
+      </div>
+      <div class="acts">
+        <button class="icon-btn" title="Use this voice" onclick="selectSample('${s.id}')">Use</button>
+        <button class="icon-btn" title="Rename" onclick="renameSample('${s.id}','${escapeAttr(s.name)}')">Rename</button>
+        <button class="icon-btn del" title="Delete" onclick="deleteSample('${s.id}')">Del</button>
+      </div>`;
+    lib.appendChild(div);
+  });
+}
+function selectSample(id) {
+  selectedId = id;
+  showStatus('Selected voice sample. Generating will use OFFLINE clone.', 'ok');
+  updateMode();
+  refreshLib();
+}
+async function renameSample(id, old) {
+  const nm = prompt('New name:', old);
+  if (!nm || nm === old) return;
+  const fd = new FormData(); fd.append('name', nm);
+  await fetch('/api/samples/' + id, { method:'PUT', body: fd });
+  refreshLib();
+}
+async function deleteSample(id) {
+  if (!confirm('Delete this voice sample?')) return;
+  if (id === selectedId) selectedId = null;
+  await fetch('/api/samples/' + id, { method:'DELETE' });
+  updateMode(); refreshLib();
+}
+
+function updateMode() {
+  const offline = !!selectedId;
+  document.getElementById('modeTag').textContent = offline ? 'OFFLINE' : 'ONLINE';
+  document.getElementById('modeTag').className = 'tag ' + (offline ? 'offline' : 'online');
+  document.getElementById('modeNote').textContent = offline
+    ? 'Will clone using the selected sample (CPU, ~1-3 min)'
+    : 'No sample selected - defaulting to online neural voice (instant)';
+}
+updateMode();
+
+// ---- Generate ----
+async function generate(forceOnline) {
+  const text = document.getElementById('text').value.trim();
+  if (!text) { showStatus('Teks kosong.', 'err'); return; }
+  const offline = !!selectedId && !forceOnline;
+  if (offline && !selectedId) { showStatus('Pick a voice sample first.', 'err'); return; }
+  const fd = new FormData();
+  fd.append('text', text);
+  fd.append('mode', offline ? 'offline' : 'online');
+  fd.append('voice', 'id-ID-ArdiNeural');
+  fd.append('speed', '1.0');
+  if (selectedId) fd.append('sample_id', selectedId);
+
+  const btn = document.getElementById('go');
+  btn.disabled = true;
+  showStatus(offline ? 'Generating (offline CPU, ~1-3 min/sentence)...' : 'Generating (online)...', '');
+  try {
+    const res = await fetch('/api/generate', { method:'POST', body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      const url = '/' + data.audio;
+      document.getElementById('audio').src = url;
+      document.getElementById('dl').href = url;
+      document.getElementById('player').style.display = '';
+      showStatus(`Done! ${data.duration_s}s audio (${data.mode}).`, 'ok');
+    } else showStatus('Error: ' + (data.error || 'unknown'), 'err');
+  } catch(e) { showStatus('Connection failed: ' + e.message, 'err'); }
+  btn.disabled = false;
+}
+function showStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.className = 'status ' + cls;
+  el.textContent = msg;
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escapeAttr(s){return s.replace(/[&"']/g,c=>({'&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));}
+refreshLib();
+</script>
+</body>
+</html>

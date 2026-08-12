@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+
+models/
+output/
+samples/
+
+server.log
+server.err.log
+
+*.wav
+*.mp3
