@@ -33,7 +33,7 @@
   .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:16px; }
   label { display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
   textarea, input[type=text], select { width:100%; background:var(--input); color:var(--text); border:1px solid var(--input-border); border-radius:8px; padding:10px; font-size:14px; }
-  textarea { min-height:100px; resize:vertical; margin-bottom:8px; }
+  textarea { min-height:100px; max-height:60vh; resize:vertical; overflow:auto; margin-bottom:8px; }
 
   .recbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   .btn { padding:10px 16px; background:var(--accent); color:#fff; border:none; border-radius:9px; font-size:14px; font-weight:600; cursor:pointer; transition:opacity .15s, transform .05s; }
@@ -115,7 +115,7 @@
       <button class="btn gray" onclick="document.getElementById('upAudio').click()">⬆ Upload audio</button>
       <input type="file" id="upAudio" accept="audio/*" style="display:none" onchange="uploadAudio(this)">
     </div>
-    <div class="hint">Recording works in Chrome/Edge/Firefox. 12s max for offline cloning.</div>
+    <div class="hint">Recording works in Chrome/Edge/Firefox. Reference clip auto-stops at 12s (best clone quality). Generation text below accepts unlimited sentences/paragraphs — up to ~12 min audio.</div>
   </div>
 
   <!-- Sample library -->
@@ -136,7 +136,8 @@
       <span class="tag offline" id="modeTag">OFFLINE</span>
       <span class="auto" id="modeNote">Will use selected voice sample</span>
     </div>
-    <textarea id="text" placeholder="Tulis teks yang ingin diubah menjadi suara..."></textarea>
+    <textarea id="text" placeholder="Tulis teks yang ingin diubah menjadi suara... (boleh banyak kalimat/paragraf)"></textarea>
+    <div class="hint" id="txtStats"></div>
     <div class="inline">
       <button class="btn" id="go" onclick="generate()">Generate Voice</button>
       <button class="btn gray" id="goForceOnline" onclick="generate(true)" title="Use online voices instead of offline clone">Force Online</button>
@@ -167,6 +168,27 @@ function toggleTheme() {
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
 }
 applyTheme(getTheme());
+
+// ---- Text stats & auto-grow ----
+const ta = document.getElementById('text');
+function updateTextStats() {
+  const val = ta.value.trim();
+  const words = val ? val.split(/\s+/).length : 0;
+  const secs = Math.round(words / 2.7);
+  const min = Math.floor(secs / 60), s = secs % 60;
+  const over = secs > 720;
+  const el = document.getElementById('txtStats');
+  el.textContent = val
+    ? `${words} kata · perkiraan suara ≈ ${min} min ${String(s).padStart(2,'0')} detik` + (over ? ' — melebihi target 12 min' : '')
+    : 'Boleh banyak kalimat/paragraf — hingga ±12 menit audio (≈ 1900 kata).';
+  el.style.color = over ? 'var(--red)' : '';
+}
+function growTextarea() {
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, window.innerHeight * 0.6) + 'px';
+}
+ta.addEventListener('input', () => { growTextarea(); updateTextStats(); });
+growTextarea(); updateTextStats();
 
 // ---- Recording ----
 async function toggleRec() {
